@@ -3,8 +3,8 @@ package baseline
 import (
 	"testing"
 
-	"github.com/sachinpandit/Collision-Evaluation-Study/pkg/geom"
-	"github.com/sachinpandit/Collision-Evaluation-Study/pkg/sim"
+	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/geom"
+	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/sim"
 )
 
 func makeEntity(id uint32, x, y, size float64) sim.Entity {

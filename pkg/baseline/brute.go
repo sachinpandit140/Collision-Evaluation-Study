@@ -1,6 +1,6 @@
 package baseline
 
-import "github.com/sachinpandit/Collision-Evaluation-Study/pkg/sim"
+import "github.com/sachinpandit140/Collision-Evaluation-Study/pkg/sim"
 
 // FindCollisions tests all N*(N-1)/2 entity pairs for AABB overlap.
 // Returns a slice of colliding entity ID pairs. This is the O(N²)

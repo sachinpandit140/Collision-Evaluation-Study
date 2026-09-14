@@ -1,3 +1,3 @@
-module github.com/sachinpandit/Collision-Evaluation-Study
+module github.com/sachinpandit140/Collision-Evaluation-Study
 
 go 1.27

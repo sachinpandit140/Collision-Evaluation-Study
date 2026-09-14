@@ -3,7 +3,7 @@ package sim
 import (
 	"math/rand"
 
-	"github.com/sachinpandit/Collision-Evaluation-Study/pkg/geom"
+	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/geom"
 )
 
 const entitySize = 2.0 // width and height of each entity AABB

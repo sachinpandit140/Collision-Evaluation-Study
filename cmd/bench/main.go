@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/sachinpandit/Collision-Evaluation-Study/pkg/baseline"
-	"github.com/sachinpandit/Collision-Evaluation-Study/pkg/sim"
+	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/baseline"
+	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/sim"
 )
 
 func main() {

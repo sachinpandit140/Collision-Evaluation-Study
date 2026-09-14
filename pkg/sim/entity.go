@@ -1,6 +1,6 @@
 package sim
 
-import "github.com/sachinpandit/Collision-Evaluation-Study/pkg/geom"
+import "github.com/sachinpandit140/Collision-Evaluation-Study/pkg/geom"
 
 // Entity represents a single moving object in the simulation.
 type Entity struct {

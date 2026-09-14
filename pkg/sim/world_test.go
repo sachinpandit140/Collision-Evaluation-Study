@@ -3,7 +3,7 @@ package sim
 import (
 	"testing"
 
-	"github.com/sachinpandit/Collision-Evaluation-Study/pkg/geom"
+	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/geom"
 )
 
 func TestNewWorld_ZeroEntities(t *testing.T) {
