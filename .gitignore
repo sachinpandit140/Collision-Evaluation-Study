@@ -1,0 +1,17 @@
+# Local context & agent tools (untracked)
+.context.md
+.agents/
+skills/
+
+# Build artifacts
+*.wasm
+
+# Telemetry output
+*.csv
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~

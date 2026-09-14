@@ -1,0 +1,249 @@
+\documentclass[12pt]{article}
+
+% --- Packages ---
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{amsmath}
+
+% --- Hyperlink styling ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=black
+}
+
+% --- Code listing style ---
+\lstdefinestyle{gostyle}{
+    language=Go,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{teal},
+    numberstyle=\tiny\color{gray},
+    numbers=left,
+    stepnumber=1,
+    frame=single,
+    breaklines=true,
+    captionpos=b,
+    tabsize=4,
+    showstringspaces=false,
+    morekeywords={func, type, struct, var, const, package, import, return, for, range, if, else}
+}
+
+% --- Header / Footer ---
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Progress Report 1}
+\lhead{CSCI-411-01}
+\cfoot{\thepage}
+
+% --- Section formatting ---
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+
+% ============================================================
+\begin{document}
+
+% --- Title Page ---
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+
+    {\LARGE\bfseries Progress Report 1\par}
+    \vspace{0.5cm}
+    {\large Empirical Comparison of Spatial Data Structures for\\
+    Broad-Phase Collision Detection Under High Entity Churn\par}
+
+    \vspace{2cm}
+
+    \begin{tabular}{rl}
+        \textbf{Author:}     & Sachin Pandit \\[6pt]
+        \textbf{Course:}     & CSCI-411-01   \\[6pt]
+        \textbf{Date:}       & September 14, 2026 \\[6pt]
+        \textbf{Repository:} & \url{https://github.com/sachinpandit/Collision-Evaluation-Study} \\
+    \end{tabular}
+
+    \vfill
+
+    \textit{Department of Computer Science}
+
+\end{titlepage}
+
+% ============================================================
+\setstretch{1.2}
+
+% ------------------------------------------------------------
+\section{Project Overview}
+
+This project is an empirical comparative analysis of two primary spatial data structures used in broad-phase collision detection: \textbf{Bounding Volume Hierarchies (BVH)} utilizing incremental refitting, and \textbf{K-Dimensional Trees (KD-Trees)} utilizing spatial rebuilding. Both acceleration structures are benchmarked against an $O(N^2)$ brute-force baseline across high entity churn conditions ($1{,}000$ to $20{,}000$ continuously moving entities).
+
+\textbf{Core Research Question:} \textit{What are the exact performance trade-offs between dynamic tree-rebuilding overhead and collision traversal efficiency under high entity churn?} 
+
+The primary metrics evaluated include per-frame tree refit/rebuild time, query traversal latency, $p_{99}$ latency spikes (frame stutter detection), and heap allocation pressure. All implementations are written in Go from scratch with zero third-party dependencies, enforcing strict execution determinism and cache-friendly contiguous memory layouts. The project repository is available at:
+\begin{center}
+    \url{https://github.com/sachinpandit/Collision-Evaluation-Study}
+\end{center}
+
+% ------------------------------------------------------------
+\section{Work Completed}
+
+\subsection{Literature Review}
+
+A targeted review of four seminal publications was conducted to formalize the theoretical foundations of the study:
+
+\begin{enumerate}
+    \item \textbf{Bentley (1975)} --- Introduced the multidimensional binary search tree (KD-Tree) for associative retrieval \cite{bentley1975}. This work establishes the principles of recursive, axis-aligned spatial partitioning and clarifies why moving geometric distributions historically necessitate full spatial rebuilds.
+    
+    \item \textbf{Wald (2007)} --- Formalized the Surface Area Heuristic (SAH) for rapid BVH construction \cite{wald2007}. Wald demonstrated that minimizing relative bounding volume surface areas directly minimizes expected traversal query costs. This formulation will govern the top-down rebuild heuristic in Phase~3.
+    
+    \item \textbf{Kopta et al.\ (2012)} --- Investigated dynamic BVH maintenance for animated scenes \cite{kopta2012}. Their analysis highlights the central trade-off of this study: bottom-up node refitting is computationally trivial but degrades tree pruning quality over time as bounds expand, whereas full rebuilds restore optimal tree quality at significant per-frame computational overhead.
+    
+    \item \textbf{Ericson (2005)} --- Outlines the standard two-phase collision pipeline (\textit{broad phase} candidate pair generation followed by \textit{narrow phase} exact intersection) and bounding volume algebra \cite{ericson2005}.
+\end{enumerate}
+
+\subsection{Architectural Implementation}
+
+Following the literature review, the core architectural foundation (Phases 1 and 2) was developed and fully tested:
+
+\begin{itemize}
+    \item \textbf{\texttt{pkg/geom}}: Implemented fundamental 2D primitives (\texttt{Vec2}, \texttt{AABB2}) with separating-axis intersection tests, bounding box mergers, and surface area evaluations.
+    \item \textbf{\texttt{pkg/sim}}: Created the simulation engine (\texttt{Entity}, \texttt{World}), including a deterministic tick loop with boundary reflection and explicit pseudorandom number generator (PRNG) seeding.
+    \item \textbf{\texttt{pkg/baseline}}: Implemented the $O(N^2)$ all-pairs broad-phase collision checker, which serves as the correctness oracle for all subsequent acceleration structures.
+    \item \textbf{Telemetry \& Telemetry Exporter (\texttt{pkg/sim/metrics.go}, \texttt{cmd/bench})}: Developed a zero-dependency benchmarking harness that captures per-frame update latency, query latency, total frame time, percentile distributions ($p_{50}, p_{95}, p_{99}$), heap delta allocations, and candidate pair counts, exporting structured CSV files.
+    \item \textbf{Automated Test Suite}: Implemented 18 comprehensive unit tests covering edge cases across geometric overlaps, determinism verification, world boundaries, and brute-force collision pair generation.
+\end{itemize}
+
+% ------------------------------------------------------------
+\section{Evidence of Progress}
+
+\subsection{Source Code Implementations}
+
+The following snippets illustrate the foundational primitives and the brute-force baseline implementation:
+
+\begin{lstlisting}[style=gostyle, caption={\texttt{AABB2} overlap and bounding box merge (\texttt{pkg/geom/aabb.go})}]
+package geom
+
+import "math"
+
+type Vec2 struct{ X, Y float64 }
+type AABB2 struct{ Min, Max Vec2 }
+
+func (a AABB2) Overlaps(b AABB2) bool {
+    return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X &&
+           a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y
+}
+
+func (a AABB2) Merge(b AABB2) AABB2 {
+    return AABB2{
+        Min: Vec2{math.Min(a.Min.X, b.Min.X), math.Min(a.Min.Y, b.Min.Y)},
+        Max: Vec2{math.Max(a.Max.X, b.Max.X), math.Max(a.Max.Y, b.Max.Y)},
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=gostyle, caption={$O(N^2)$ brute-force baseline candidate pair generation (\texttt{pkg/baseline/brute.go})}]
+package baseline
+
+import "github.com/sachinpandit/Collision-Evaluation-Study/pkg/sim"
+
+func FindCollisions(entities []sim.Entity) [][2]uint32 {
+    var pairs [][2]uint32
+    for i := 0; i < len(entities); i++ {
+        for j := i + 1; j < len(entities); j++ {
+            if entities[i].Bounds.Overlaps(entities[j].Bounds) {
+                pairs = append(pairs, [2]uint32{entities[i].ID, entities[j].ID})
+            }
+        }
+    }
+    return pairs
+}
+\end{lstlisting}
+
+\subsection{Preliminary Benchmark Telemetry}
+
+The benchmarking harness was executed locally on an Apple M4 system under fixed seed parameters ($\text{seed}=42$, world dimensions $1000 \times 1000$, entity size $2 \times 2$). Table~\ref{tab:benchmarks} presents the empirical baseline measurements:
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Entities ($N$)} & \textbf{Frames} & \textbf{Total Checks} & \textbf{$p_{50}$ (ms)} & \textbf{$p_{95}$ (ms)} & \textbf{$p_{99}$ (ms)} & \textbf{Memory Churn} \\
+\midrule
+500   & 50  & 124,750   & 0.658 & 0.818 & 0.844 & $<$ 32 B/frame \\
+1,000 & 100 & 499,500   & 1.895 & 3.665 & 4.419 & $<$ 32 B/frame \\
+\bottomrule
+\end{tabular}
+\caption{Empirical baseline performance demonstrating quadratic growth in query time.}
+\label{tab:benchmarks}
+\end{table}
+
+All 18 automated unit tests pass with zero failures:
+\begin{center}
+\texttt{PASS: pkg/geom (8/8) \quad PASS: pkg/sim (5/5) \quad PASS: pkg/baseline (5/5)}
+\end{center}
+
+% ------------------------------------------------------------
+\section{Challenges}
+
+\textbf{Access to Paywalled Literature:} The original Wald (2007) paper is published under IEEE Xplore subscription. Access was substituted by reviewing its mathematical definitions via public academic citations, thesis archives, and Ericson (2005). The SAH surface area cost formulations are standardized, meaning project execution was unhindered.
+
+\textbf{Execution Determinism:} To guarantee scientific reproducibility, random initialization was decoupled from global system clocks. Go's non-deterministic map iteration was completely excluded from hot simulation pathways, relying strictly on ordered slices and explicitly seeded \texttt{math/rand} instances.
+
+\textbf{Memory Allocation Overhead:} Accurately measuring per-frame latency without garbage collection (GC) interference required pre-allocating entity buffers and tracking exact heap allocation deltas via \texttt{runtime.MemStats}.
+
+% ------------------------------------------------------------
+\section{Next Steps}
+
+With the foundational pipeline and baseline metrics established, the next milestones are:
+
+\begin{enumerate}
+    \item \textbf{Phase 3 --- Dynamic BVH Implementation (\texttt{pkg/bvh})}:
+    Implement binary BVH construction using bottom-up $O(N)$ bounding box refitting and top-down SAH rebuilding.
+    \item \textbf{Phase 4 --- KD-Tree Implementation (\texttt{pkg/kdtree})}:
+    Implement spatial median and sliding-midpoint split algorithms with full reconstruction under dynamic entity movement.
+    \item \textbf{Comparative Stress Testing}:
+    Scale simulations from $1{,}000$ to $20{,}000$ entities across both structures to identify the precise threshold where tree refitting degrades below rebuild performance.
+\end{enumerate}
+
+% ------------------------------------------------------------
+\begin{thebibliography}{9}
+
+\bibitem{bentley1975}
+Bentley, J.~L. (1975).
+\newblock Multidimensional binary search trees used for associative searching.
+\newblock \textit{Communications of the ACM}, 18(9), 509--517.
+\newblock \url{https://doi.org/10.1145/361002.361007}
+
+\bibitem{wald2007}
+wald, I. (2007).
+\newblock On fast construction of SAH-based bounding volume hierarchies.
+\newblock In \textit{Proceedings of the 2007 IEEE Symposium on Interactive Ray
+Tracing (RT '07)}.
+\newblock \url{https://doi.org/10.1109/RT.2007.4342588}
+
+\bibitem{kopta2012}
+Kopta, D., Ize, T., Spjut, J., Brunvand, E., Davis, A., \& Kensler, A. (2012).
+\newblock Fast, effective BVH updates for animated scenes.
+\newblock In \textit{Proceedings of the ACM SIGGRAPH Symposium on Interactive
+3D Graphics and Games (I3D '12)}.
+\newblock \url{https://doi.org/10.1145/2159616.2159632}
+
+\bibitem{ericson2005}
+Ericson, C. (2005).
+\newblock \textit{Real-Time Collision Detection}.
+\newblock Morgan Kaufmann.
+\newblock ISBN: 978-1558607323.
+
+\end{thebibliography}
+
+\end{document}
