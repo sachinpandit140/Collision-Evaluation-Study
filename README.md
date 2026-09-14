@@ -20,7 +20,6 @@ Comparing:
 │   ├── baseline/       # Brute-force O(N²) reference implementation
 │   ├── geom/           # 2D primitives (Vec2, AABB2)
 │   └── sim/            # Entity, World, deterministic tick loop, metrics/CSV exporter
-└── progress_report_1.tex  # Progress Report 1 LaTeX source
 ```
 
 ## Getting Started
