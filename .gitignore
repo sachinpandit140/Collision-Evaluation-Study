@@ -6,6 +6,14 @@ skills/
 # Build artifacts
 *.wasm
 
+# Reports & LaTeX artifacts
+*.tex
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
+
 # Telemetry output
 *.csv
 
