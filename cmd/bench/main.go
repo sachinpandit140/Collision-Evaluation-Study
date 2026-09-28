@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/baseline"
+	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/bvh"
+	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/kdtree"
 	"github.com/sachinpandit140/Collision-Evaluation-Study/pkg/sim"
 )
 
@@ -16,30 +18,53 @@ func main() {
 	frames := flag.Int("frames", 100, "number of simulation frames")
 	seed := flag.Int64("seed", 42, "random seed for determinism")
 	out := flag.String("out", "results.csv", "CSV output path")
+	method := flag.String("method", "brute", "collision method: brute, bvh, kdtree")
 	flag.Parse()
 
-	fmt.Printf("Running brute-force baseline: %d entities, %d frames, seed=%d\n", *n, *frames, *seed)
+	fmt.Printf("Running %s: %d entities, %d frames, seed=%d\n", *method, *n, *frames, *seed)
 
 	w := sim.NewWorld(1000, 1000, *n, *seed)
 	rec := &sim.Recorder{}
 	dt := 1.0
+
+	var bvhTree *bvh.Tree
 
 	for f := 0; f < *frames; f++ {
 		var mem runtime.MemStats
 
 		frameStart := time.Now()
 
-		// Tree update phase (brute-force has no tree, so this is just the tick)
+		// Tree update phase
 		tickStart := time.Now()
 		w.Tick(dt)
+
+		switch *method {
+		case "bvh":
+			if bvhTree == nil {
+				bvhTree = bvh.Build(w.Entities)
+			} else {
+				bvhTree.Refit(w.Entities)
+			}
+		case "kdtree":
+			// KD-Tree rebuilds from scratch each frame
+		}
 		tickMs := float64(time.Since(tickStart).Microseconds()) / 1000.0
 
-		// Query phase (brute-force collision check)
+		// Query phase
 		runtime.ReadMemStats(&mem)
 		allocBefore := mem.TotalAlloc
 
 		queryStart := time.Now()
-		pairs := baseline.FindCollisions(w.Entities)
+		var pairs [][2]uint32
+		switch *method {
+		case "brute":
+			pairs = baseline.FindCollisions(w.Entities)
+		case "bvh":
+			pairs = bvhTree.FindCollisions(w.Entities)
+		case "kdtree":
+			kdTree := kdtree.Build(w.Entities)
+			pairs = kdTree.FindCollisions(w.Entities)
+		}
 		queryMs := float64(time.Since(queryStart).Microseconds()) / 1000.0
 
 		runtime.ReadMemStats(&mem)
