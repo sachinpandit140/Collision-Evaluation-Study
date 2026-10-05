@@ -18,7 +18,7 @@ func main() {
 	frames := flag.Int("frames", 100, "number of simulation frames")
 	seed := flag.Int64("seed", 42, "random seed for determinism")
 	out := flag.String("out", "results.csv", "CSV output path")
-	method := flag.String("method", "brute", "collision method: brute, bvh, kdtree")
+	method := flag.String("method", "brute", "collision method: brute, bvh, bvh-rebuild, kdtree")
 	flag.Parse()
 
 	fmt.Printf("Running %s: %d entities, %d frames, seed=%d\n", *method, *n, *frames, *seed)
@@ -28,29 +28,32 @@ func main() {
 	dt := 1.0
 
 	var bvhTree *bvh.Tree
+	var kdTree *kdtree.Tree
 
 	for f := 0; f < *frames; f++ {
 		var mem runtime.MemStats
 
 		frameStart := time.Now()
 
-		// Tree update phase
+		// Tree update phase (kinematic tick + tree build/refit)
 		tickStart := time.Now()
 		w.Tick(dt)
 
 		switch *method {
-		case "bvh":
+		case "bvh", "bvh-refit":
 			if bvhTree == nil {
 				bvhTree = bvh.Build(w.Entities)
 			} else {
 				bvhTree.Refit(w.Entities)
 			}
+		case "bvh-rebuild":
+			bvhTree = bvh.Build(w.Entities)
 		case "kdtree":
-			// KD-Tree rebuilds from scratch each frame
+			kdTree = kdtree.Build(w.Entities)
 		}
 		tickMs := float64(time.Since(tickStart).Microseconds()) / 1000.0
 
-		// Query phase
+		// Query phase (broad-phase candidate pair generation)
 		runtime.ReadMemStats(&mem)
 		allocBefore := mem.TotalAlloc
 
@@ -59,11 +62,13 @@ func main() {
 		switch *method {
 		case "brute":
 			pairs = baseline.FindCollisions(w.Entities)
-		case "bvh":
+		case "bvh", "bvh-refit", "bvh-rebuild":
 			pairs = bvhTree.FindCollisions(w.Entities)
 		case "kdtree":
-			kdTree := kdtree.Build(w.Entities)
 			pairs = kdTree.FindCollisions(w.Entities)
+		default:
+			fmt.Fprintf(os.Stderr, "unknown method: %s\n", *method)
+			os.Exit(1)
 		}
 		queryMs := float64(time.Since(queryStart).Microseconds()) / 1000.0
 
